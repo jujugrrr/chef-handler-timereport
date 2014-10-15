@@ -62,9 +62,23 @@ class Chef
       def write_report_csv
         savetime = Time.now.strftime("%Y%m%d%H%M%S")
         CSV.open("#{@config[:path]}/chef-run-report-#{savetime}.csv", 'w', {:force_quotes => true}) do |csv|
-          csv << %w(Elapsed_time Resource_name Resource_type Source_cookbook Source_recipe Source_line)
+          # Resources
+          csv << ['Resources']
+          csv << %w(Elapsed_time Resource_name Source_cookbook Source_recipe Source_line)
           @resources.each do|resource|
-            csv << [ resource.elapsed_time.to_s, resource.name, resource.resource_name, resource.cookbook_name, resource.recipe_name, resource.source_line ]
+            csv << [ resource.elapsed_time.to_s, "#{resource.resource_name}(#{resource.name})", resource.cookbook_name, resource.recipe_name, resource.source_line ]
+          end
+          # Cookbooks
+          csv << ['Cookbooks']
+          csv << %w(Name Elapsed_time)
+          @cookbooks.each do|cookbook, time|
+            csv << [ time, cookbook]
+          end
+          # Recipes
+          csv << ['Recipes']
+          csv << %w(Name Elapsed_time)
+          @recipes.each do|recipe, time|
+            csv << [ time, recipe]
           end
         end
         Chef::Log.info "CSV report generated : #{@config[:path]}/chef-run-report-#{savetime}.csv"
