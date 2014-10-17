@@ -14,10 +14,12 @@ class Chef
         @config = config
         @config[:path] ||= '/var/chef/reports'
         @config[:format] ||= 'csv'
-        @config[:log] ||= 'yes'
+        @config[:log] ||= true
+        @config[:debug] ||= false
         @resources = nil
         @cookbooks = Hash.new(0)
         @recipes = Hash.new(0)
+        @total = 0
         @config
       end
 
@@ -26,22 +28,28 @@ class Chef
         @resources.each do |r|
           @cookbooks[r.cookbook_name] += r.elapsed_time
           @recipes["#{r.cookbook_name}::#{r.recipe_name}"] += r.elapsed_time
+          @total += r.elapsed_time
         end
       end
 
       def report
         sort_resources
         build_report_dir
-        log_report
+        log_report if @config[:log]
         case @config[:format]
         when 'csv'
-         write_report_csv
+          write_report_csv
         else
           write_report
         end
       end
 
       def log_report
+        Chef::Log.info "Elapsed time total"
+        Chef::Log.info "------------  -------------"
+        Chef::Log.info "%12f %s" % [ data[:elapsed_time], 'Total run']
+        Chef::Log.info "%12f %s" % [ @total, 'Total spent in resources']
+        Chef::Log.info "%12f %s" % [ data[:elapsed_time]-@total, 'Total spend in retrieving/compilation']
         Chef::Log.info "Elapsed time per resource"
         Chef::Log.info "------------  -------------"
         @resources.each do |resource|
@@ -63,6 +71,11 @@ class Chef
         savetime = Time.now.strftime("%Y%m%d%H%M%S")
         CSV.open("#{@config[:path]}/chef-run-report-#{savetime}.csv", 'w', {:force_quotes => true}) do |csv|
           # Resources
+          csv << ['Total']
+          csv << %w(Elapsed_time Type)
+          csv << [ data[:elapsed_time], 'Total time run']
+          csv << [ @total, 'Total time in resources']
+          csv << [ data[:elapsed_time]-@total, 'Total time on retrieving/solving dependency']
           csv << ['Resources']
           csv << %w(Elapsed_time Resource_name Source_cookbook Source_recipe Source_line)
           @resources.each do|resource|
@@ -82,6 +95,7 @@ class Chef
           end
         end
         Chef::Log.info "CSV report generated : #{@config[:path]}/chef-run-report-#{savetime}.csv"
+        Chef::Log.info File.read("#{@config[:path]}/chef-run-report-#{savetime}.csv")
       end
 
       def write_report
